@@ -1,0 +1,29 @@
+<div id="app"></div>
+<script src="app.js"></script>
+<script src="sjcl.js"></script>
+<script>
+    var app = Elm.Ratchet.fullscreen()
+    //var curve = sjcl.ecc.curves.c521
+    var curve = sjcl.ecc.curves.c192
+
+    app.ports.generate_keypair.subscribe(function() {
+        var keys = sjcl.ecc.elGamal.generateKeys(curve)
+        var sec = keys.sec.serialize()
+        var pub = keys.pub.serialize()
+
+        pair = {"pub":pub, "sec":sec}
+        console.log(pair)
+        app.ports.generated_keypair.send(pair)
+    });
+
+    app.ports.hash_keys.subscribe(function (keys) {
+        keys = JSON.parse(keys)
+
+        var sec = sjcl.ecc.deserialize(keys.sec)
+        var foreign = sjcl.ecc.deserialize(keys.pub)
+
+        hash = sec.dh(foreign)
+        console.log(hash)
+        //app.ports.hashed_keys.send(hash)
+    });
+</script>
