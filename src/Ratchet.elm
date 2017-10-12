@@ -51,17 +51,19 @@ blankPriKey =
 type alias Model =
     { keypair : KeyPair
     , foreignKey : String
+    , hash : List Int
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( (Model (KeyPair blankPubKey blankPriKey) ""), Cmd.none )
+    ( (Model (KeyPair blankPubKey blankPriKey) "" []), Cmd.none )
 
 
 type Msg
     = GenerateDH
     | HashKeys
+    | NewHashedKeys (List Int)
     | NewKeyPair Json.Decode.Value
     | NewForeignKey String
 
@@ -91,6 +93,9 @@ update msg model =
 
         NewForeignKey fk ->
             ( { model | foreignKey = fk }, Cmd.none )
+
+        NewHashedKeys xs ->
+            ( { model | hash = xs }, Cmd.none )
 
 
 getKeyPair : Json.Decode.Value -> Result String KeyPair
@@ -191,15 +196,21 @@ encodePrivateKey pk =
 port generate_keypair : Bool -> Cmd msg
 
 
+port generated_keypair : (Json.Decode.Value -> msg) -> Sub msg
+
+
 port hash_keys : String -> Cmd msg
 
 
-port generated_keypair : (Json.Decode.Value -> msg) -> Sub msg
+port hashed_keys : (List Int -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    generated_keypair NewKeyPair
+    Sub.batch
+        [ generated_keypair NewKeyPair
+        , hashed_keys NewHashedKeys
+        ]
 
 
 view : Model -> Html Msg
@@ -215,6 +226,7 @@ view model =
 viewKeyPair : Model -> Html Msg
 viewKeyPair model =
     ul []
-        [ li [] [ text <| "P: " ++ model.keypair.public.point ]
-        , li [] [ text <| "S: " ++ model.keypair.private.exponent ]
+        [ li [] [ text <| "Public: " ++ model.keypair.public.point ]
+        , li [] [ text <| "Secret: " ++ model.keypair.private.exponent ]
+        , li [] [ text <| "Hash:   " ++ toString model.hash ]
         ]
