@@ -7,6 +7,7 @@ import Json.Decode exposing (string, bool, Decoder)
 import Json.Encode
 import Json.Decode.Pipeline exposing (decode, required)
 import String
+import Update.Extra exposing (andThen)
 
 
 main =
@@ -16,6 +17,10 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
+
+
+type alias BitArray =
+    List Int
 
 
 type alias KeyPair =
@@ -51,13 +56,24 @@ blankPriKey =
 type alias Model =
     { keypair : KeyPair
     , foreignKey : String
-    , hash : List Int
+    , hash : BitArray
+    , rootKey : BitArray
+    , receiveKey : BitArray
+    , sendKey : BitArray
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( (Model (KeyPair blankPubKey blankPriKey) "" []), Cmd.none )
+    ( (Model (KeyPair blankPubKey blankPriKey)
+        ""
+        []
+        [ 1, 1, 1, 1, 1, 1, 1, 1 ]
+        []
+        []
+      )
+    , Cmd.none
+    )
 
 
 type Msg
@@ -66,6 +82,13 @@ type Msg
     | NewHashedKeys (List Int)
     | NewKeyPair Json.Decode.Value
     | NewForeignKey String
+    | UpdateChain String
+    | NewChain ( BitArray, String, BitArray )
+
+
+
+--| ReceiveFK
+--| Init
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -96,6 +119,37 @@ update msg model =
 
         NewHashedKeys xs ->
             ( { model | hash = xs }, Cmd.none )
+
+        UpdateChain chain ->
+            ( model, update_chain ( model.hash, chain, model.rootKey ) )
+
+        NewChain ( root, which, chain ) ->
+            case which of
+                "receive" ->
+                    ( { model | rootKey = root, receiveKey = chain }, Cmd.none )
+
+                "send" ->
+                    ( { model | rootKey = root, sendKey = chain }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+
+
+{--
+        ReceiveFK ->
+            ( model, Cmd.none )
+                |> andThen update HashKeys
+                |> andThen update (UpdateChain "receive")
+                |> andThen update GenerateDH
+                |> andThen update HashKeys
+                |> andThen update (UpdateChain "send")
+
+        Init ->
+            ( model, Cmd.none )
+                |> andThen update HashKeys
+                |> andThen update (UpdateChain "send")
+--}
 
 
 getKeyPair : Json.Decode.Value -> Result String KeyPair
@@ -202,7 +256,13 @@ port generated_keypair : (Json.Decode.Value -> msg) -> Sub msg
 port hash_keys : String -> Cmd msg
 
 
-port hashed_keys : (List Int -> msg) -> Sub msg
+port hashed_keys : (BitArray -> msg) -> Sub msg
+
+
+port update_chain : ( BitArray, String, BitArray ) -> Cmd msg
+
+
+port new_chain : (( BitArray, String, BitArray ) -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
@@ -210,6 +270,7 @@ subscriptions model =
     Sub.batch
         [ generated_keypair NewKeyPair
         , hashed_keys NewHashedKeys
+        , new_chain NewChain
         ]
 
 
@@ -218,15 +279,23 @@ view model =
     div []
         [ button [ onClick GenerateDH ] [ text "Generate Keys" ]
         , button [ onClick HashKeys ] [ text "Hash Keys" ]
+        , button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
+        , button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
+
+        --, button [ onClick Init ] [ text "Init" ]
+        --, button [ onClick ReceiveFK ] [ text "ReceiveFK" ]
         , input [ onInput NewForeignKey ] []
-        , viewKeyPair model
+        , viewInternals model
         ]
 
 
-viewKeyPair : Model -> Html Msg
-viewKeyPair model =
+viewInternals : Model -> Html Msg
+viewInternals model =
     ul []
         [ li [] [ text <| "Public: " ++ model.keypair.public.point ]
         , li [] [ text <| "Secret: " ++ model.keypair.private.exponent ]
         , li [] [ text <| "Hash:   " ++ toString model.hash ]
+        , li [] [ text <| "Root:   " ++ toString model.rootKey ]
+        , li [] [ text <| "Receive:" ++ toString model.receiveKey ]
+        , li [] [ text <| "Send:   " ++ toString model.sendKey ]
         ]

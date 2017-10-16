@@ -7,23 +7,44 @@
     var curve = sjcl.ecc.curves.c192
 
     app.ports.generate_keypair.subscribe(function() {
+        console.log("Generating keypair.")
         var keys = sjcl.ecc.elGamal.generateKeys(curve)
         var sec = keys.sec.serialize()
         var pub = keys.pub.serialize()
 
         pair = {"pub":pub, "sec":sec}
-        console.log(pair)
+        //console.log(pair)
         app.ports.generated_keypair.send(pair)
     });
 
     app.ports.hash_keys.subscribe(function (keys) {
+        console.log("Hashing foreign key.")
         keys = JSON.parse(keys)
 
         var sec = sjcl.ecc.deserialize(keys.sec)
         var foreign = sjcl.ecc.deserialize(keys.pub)
 
         hash = sec.dh(foreign)
-        console.log(hash)
+        //console.log(hash)
         app.ports.hashed_keys.send(hash)
+    });
+
+    app.ports.update_chain.subscribe(function (tuple) {
+        hash = tuple[0]
+        which = tuple[1]
+        root = tuple[2]
+        console.log("Update " + which + " chain.")
+
+        output = sjcl.misc.hkdf(hash, 512, root, "update chain")
+
+        newroot = output.slice(0,8)
+        newchain = output.slice(8)
+
+        //console.log(newroot,newchain)
+        keys = new Array(3)
+        keys[0] = newroot
+        keys[1] = which
+        keys[2] = newchain
+        app.ports.new_chain.send(keys)
     });
 </script>
