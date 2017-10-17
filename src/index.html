@@ -44,6 +44,23 @@
         app.ports.new_chain.send(sendChain)
     });
 
+    app.ports.kdf_ck.subscribe(function(tuple) {
+        var chainKey = tuple[0]
+        var which = tuple[1]
+
+        var hmac = new sjcl.misc.hmac(chainKey, sjcl.hash.sha512)
+
+        var newChainKey = hmac.encrypt("new chain")
+        var newMsgKey = hmac.encrypt("new msg")
+
+        keys = new Array(3)
+        keys[0] = newChainKey
+        keys[1] = which
+        keys[2] = newMsgKey
+
+        app.ports.kdf_ck_get.send(keys)
+    });
+
     app.ports.generate_keypair.subscribe(function() {
         app.ports.generated_keypair.send(
             serializePair(generateDH()))

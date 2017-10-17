@@ -58,8 +58,10 @@ type alias Model =
     , foreignKey : String
     , hash : BitArray
     , rootKey : BitArray
-    , receiveKey : BitArray
-    , sendKey : BitArray
+    , receiveChainKey : BitArray
+    , sendChainKey : BitArray
+    , receiveMsgKey : BitArray
+    , sendMsgKey : BitArray
     }
 
 
@@ -67,6 +69,8 @@ init : ( Model, Cmd Msg )
 init =
     ( (Model (KeyPair blankPubKey blankPriKey)
         ""
+        []
+        []
         []
         []
         []
@@ -86,6 +90,8 @@ type Msg
     | NewChain ( BitArray, String, BitArray )
     | Init
     | ReceiveFK
+    | SymmetricRatchet String
+    | NewSymmetricRatchet ( BitArray, String, BitArray )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -123,10 +129,10 @@ update msg model =
         NewChain ( root, which, chain ) ->
             case which of
                 "receive" ->
-                    ( { model | rootKey = root, receiveKey = chain }, Cmd.none )
+                    ( { model | rootKey = root, receiveChainKey = chain }, Cmd.none )
 
                 "send" ->
-                    ( { model | rootKey = root, sendKey = chain }, Cmd.none )
+                    ( { model | rootKey = root, sendChainKey = chain }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -150,6 +156,28 @@ update msg model =
                 , model.rootKey
                 )
             )
+
+        SymmetricRatchet which ->
+            case which of
+                "receive" ->
+                    ( model, kdf_ck ( model.receiveChainKey, which ) )
+
+                "send" ->
+                    ( model, kdf_ck ( model.sendChainKey, which ) )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        NewSymmetricRatchet ( chain, which, msg ) ->
+            case which of
+                "receive" ->
+                    ( { model | receiveChainKey = chain, receiveMsgKey = msg }, Cmd.none )
+
+                "send" ->
+                    ( { model | sendChainKey = chain, sendMsgKey = msg }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
 
 
@@ -288,12 +316,19 @@ port update_chain : ( BitArray, String, BitArray ) -> Cmd msg
 port new_chain : (( BitArray, String, BitArray ) -> msg) -> Sub msg
 
 
+port kdf_ck : ( BitArray, String ) -> Cmd msg
+
+
+port kdf_ck_get : (( BitArray, String, BitArray ) -> msg) -> Sub msg
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ generated_keypair NewKeyPair
         , hashed_keys NewHashedKeys
         , new_chain NewChain
+        , kdf_ck_get NewSymmetricRatchet
         ]
 
 
@@ -304,6 +339,8 @@ view model =
         , button [ onClick HashKeys ] [ text "Hash Keys" ]
         , button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
         , button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
+        , button [ onClick (SymmetricRatchet "receive") ] [ text "Ratchet Receive" ]
+        , button [ onClick (SymmetricRatchet "send") ] [ text "Ratchet Send" ]
         , button [ onClick Init ] [ text "Init" ]
         , button [ onClick ReceiveFK ] [ text "ReceiveFK" ]
         , input [ onInput NewForeignKey ] []
@@ -318,6 +355,8 @@ viewInternals model =
         , li [] [ text <| "Secret: " ++ model.keypair.private.exponent ]
         , li [] [ text <| "Hash:   " ++ toString model.hash ]
         , li [] [ text <| "Root:   " ++ toString model.rootKey ]
-        , li [] [ text <| "Receive:" ++ toString model.receiveKey ]
-        , li [] [ text <| "Send:   " ++ toString model.sendKey ]
+        , li [] [ text <| "rChain:" ++ toString model.receiveChainKey ]
+        , li [] [ text <| "sChain:   " ++ toString model.sendChainKey ]
+        , li [] [ text <| "rMsg:" ++ toString model.receiveMsgKey ]
+        , li [] [ text <| "sMsg:   " ++ toString model.sendMsgKey ]
         ]
