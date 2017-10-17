@@ -68,7 +68,7 @@ init =
     ( (Model (KeyPair blankPubKey blankPriKey)
         ""
         []
-        [ 1, 1, 1, 1, 1, 1, 1, 1 ]
+        []
         []
         []
       )
@@ -84,11 +84,8 @@ type Msg
     | NewForeignKey String
     | UpdateChain String
     | NewChain ( BitArray, String, BitArray )
-
-
-
---| ReceiveFK
---| Init
+    | Init
+    | ReceiveFK
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -133,6 +130,26 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        Init ->
+            ( model
+            , init_ratchet
+                ( (Json.Encode.encode 0
+                    (encodeForeignKey model.foreignKey)
+                  )
+                , model.rootKey
+                )
+            )
+
+        ReceiveFK ->
+            ( model
+            , receive_fk
+                ( encodeKeyPair
+                    model.foreignKey
+                    model.keypair.private
+                , model.rootKey
+                )
+            )
 
 
 
@@ -247,6 +264,12 @@ encodePrivateKey pk =
 -}
 
 
+port init_ratchet : ( String, BitArray ) -> Cmd msg
+
+
+port receive_fk : ( String, BitArray ) -> Cmd msg
+
+
 port generate_keypair : Bool -> Cmd msg
 
 
@@ -281,9 +304,8 @@ view model =
         , button [ onClick HashKeys ] [ text "Hash Keys" ]
         , button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
         , button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
-
-        --, button [ onClick Init ] [ text "Init" ]
-        --, button [ onClick ReceiveFK ] [ text "ReceiveFK" ]
+        , button [ onClick Init ] [ text "Init" ]
+        , button [ onClick ReceiveFK ] [ text "ReceiveFK" ]
         , input [ onInput NewForeignKey ] []
         , viewInternals model
         ]

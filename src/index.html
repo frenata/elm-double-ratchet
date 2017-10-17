@@ -6,45 +6,104 @@
     //var curve = sjcl.ecc.curves.c521
     var curve = sjcl.ecc.curves.c192
 
-    app.ports.generate_keypair.subscribe(function() {
-        console.log("Generating keypair.")
-        var keys = sjcl.ecc.elGamal.generateKeys(curve)
-        var sec = keys.sec.serialize()
-        var pub = keys.pub.serialize()
+    app.ports.init_ratchet.subscribe(function(input) {
+        var root = input[1]
+        var fk = input[0]
+        fk = JSON.parse(fk)
+        fk = sjcl.ecc.deserialize(fk)
+        
+        var keypair = generateDH()
+        var pair = serializePair(keypair)
+        var hash = hashDH(keypair.sec, fk)
+        var chainKeys = updateChain(hash,"send",root)
 
-        pair = {"pub":pub, "sec":sec}
-        //console.log(pair)
         app.ports.generated_keypair.send(pair)
+        app.ports.hashed_keys.send(hash)
+        app.ports.new_chain.send(chainKeys)
+    });
+    
+    app.ports.receive_fk.subscribe(function(input) {
+        var keys = input[0]
+        var root = input[1]
+        
+        keys = deserializePair(keys)
+        var sec = keys.sec
+        var foreign = keys.pub
+        var hash = hashDH(sec, foreign)
+        var receiveChain = updateChain(hash,"receive",root)
+        root = receiveChain[0]
+
+        var keypair = generateDH()
+        var pair = serializePair(keypair)
+        hash = hashDH(keypair.sec, foreign)
+        var sendChain = updateChain(hash,"send",root)
+
+        app.ports.generated_keypair.send(pair)
+        app.ports.hashed_keys.send(hash)
+        app.ports.new_chain.send(receiveChain)
+        app.ports.new_chain.send(sendChain)
+    });
+
+    app.ports.generate_keypair.subscribe(function() {
+        app.ports.generated_keypair.send(
+            serializePair(generateDH()))
     });
 
     app.ports.hash_keys.subscribe(function (keys) {
-        console.log("Hashing foreign key.")
-        keys = JSON.parse(keys)
-
-        var sec = sjcl.ecc.deserialize(keys.sec)
-        var foreign = sjcl.ecc.deserialize(keys.pub)
-
-        hash = sec.dh(foreign)
-        //console.log(hash)
-        app.ports.hashed_keys.send(hash)
+        keys = deserializePair(keys)
+        var sec = keys.sec
+        var foreign = keys.pub
+        
+        app.ports.hashed_keys.send(hashDH(sec,foreign))
     });
 
     app.ports.update_chain.subscribe(function (tuple) {
         hash = tuple[0]
         which = tuple[1]
         root = tuple[2]
-        console.log("Update " + which + " chain.")
 
-        output = sjcl.misc.hkdf(hash, 512, root, "update chain")
-
-        newroot = output.slice(0,8)
-        newchain = output.slice(8)
-
-        //console.log(newroot,newchain)
-        keys = new Array(3)
-        keys[0] = newroot
-        keys[1] = which
-        keys[2] = newchain
-        app.ports.new_chain.send(keys)
+        app.ports.new_chain.send(updateChain(hash,which,root))
     });
+
+function updateChain(hash,which,root) {
+    console.log("Update " + which + " chain.")
+    output = sjcl.misc.hkdf(hash, 512, root, "update chain")
+
+    newroot = output.slice(0,8)
+    newchain = output.slice(8)
+
+    keys = new Array(3)
+    keys[0] = newroot
+    keys[1] = which
+    keys[2] = newchain
+    
+    return keys
+}
+
+function generateDH() {
+    console.log("Generating keypair.")
+    return sjcl.ecc.elGamal.generateKeys(curve)
+}
+
+function hashDH(sec, foreign) {
+    console.log("Hashing foreign key.")
+    hash = sec.dh(foreign)
+    return hash
+}
+
+function serializePair(keypair) {
+    console.log("Serializing keypair")
+    var sec = keypair.sec.serialize()
+    var pub = keypair.pub.serialize()
+    var pair = {"pub":pub, "sec":sec}
+    return pair
+}
+
+function deserializePair(keypair) {
+    keys = JSON.parse(keypair)
+    var sec = sjcl.ecc.deserialize(keys.sec)
+    var foreign = sjcl.ecc.deserialize(keys.pub)
+    return {"sec":sec, "pub":foreign}
+}
+
 </script>
