@@ -1,7 +1,7 @@
 port module Ratchet exposing (..)
 
 import Html exposing (..)
-import Html.Attributes
+import Html.Attributes exposing (value)
 import Html.Events exposing (..)
 import Json.Decode exposing (string, bool, Decoder)
 import Json.Encode
@@ -62,6 +62,8 @@ type alias Model =
     , sendChainKey : BitArray
     , receiveMsgKey : BitArray
     , sendMsgKey : BitArray
+    , plaintext : String
+    , ciphertext : String
     }
 
 
@@ -75,6 +77,8 @@ init =
         []
         []
         []
+        ""
+        ""
       )
     , Cmd.none
     )
@@ -92,11 +96,33 @@ type Msg
     | ReceiveFK
     | SymmetricRatchet String
     | NewSymmetricRatchet ( BitArray, String, BitArray )
+    | NewPlaintext String
+    | NewCiphertext String
+    | Encrypt
+    | Decrypt
+
+
+
+--| NewInputCipher String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        --NewInputCipher t ->
+        --( { model | ciphertext = toBitArray t }, Cmd.none )
+        NewPlaintext t ->
+            ( { model | plaintext = t }, Cmd.none )
+
+        NewCiphertext t ->
+            ( { model | ciphertext = t }, Cmd.none )
+
+        Encrypt ->
+            ( model, encrypt ( model.plaintext, model.sendMsgKey ) )
+
+        Decrypt ->
+            ( model, decrypt ( model.ciphertext, model.receiveMsgKey ) )
+
         GenerateDH ->
             ( model, generate_keypair (True) )
 
@@ -322,6 +348,18 @@ port kdf_ck : ( BitArray, String ) -> Cmd msg
 port kdf_ck_get : (( BitArray, String, BitArray ) -> msg) -> Sub msg
 
 
+port encrypt : ( String, BitArray ) -> Cmd msg
+
+
+port new_encrypt : (String -> msg) -> Sub msg
+
+
+port decrypt : ( String, BitArray ) -> Cmd msg
+
+
+port new_decrypt : (String -> msg) -> Sub msg
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
@@ -329,6 +367,8 @@ subscriptions model =
         , hashed_keys NewHashedKeys
         , new_chain NewChain
         , kdf_ck_get NewSymmetricRatchet
+        , new_encrypt NewCiphertext
+        , new_decrypt NewPlaintext
         ]
 
 
@@ -336,16 +376,34 @@ view : Model -> Html Msg
 view model =
     div []
         [ button [ onClick GenerateDH ] [ text "Generate Keys" ]
-        , button [ onClick HashKeys ] [ text "Hash Keys" ]
-        , button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
-        , button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
-        , button [ onClick (SymmetricRatchet "receive") ] [ text "Ratchet Receive" ]
-        , button [ onClick (SymmetricRatchet "send") ] [ text "Ratchet Send" ]
+
+        --, button [ onClick HashKeys ] [ text "Hash Keys" ]
+        --, button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
+        --, button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
         , button [ onClick Init ] [ text "Init" ]
         , button [ onClick ReceiveFK ] [ text "ReceiveFK" ]
+        , button [ onClick (SymmetricRatchet "receive") ] [ text "Ratchet Receive" ]
+        , button [ onClick (SymmetricRatchet "send") ] [ text "Ratchet Send" ]
         , input [ onInput NewForeignKey ] []
         , viewInternals model
+        , textarea [ onInput NewPlaintext, value model.plaintext ] []
+        , textarea [ onInput NewCiphertext, value model.ciphertext ] []
+        , button [ onClick Encrypt ] [ text "encrypt" ]
+        , button [ onClick Decrypt ] [ text "decrypt" ]
         ]
+
+
+toBitArray : String -> BitArray
+toBitArray str =
+    let
+        stripped =
+            String.dropLeft 1 str |> String.dropRight 1
+
+        strs =
+            String.split "," stripped
+    in
+        List.map String.toInt strs
+            |> List.map (Result.withDefault 0)
 
 
 viewInternals : Model -> Html Msg
