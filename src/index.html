@@ -7,6 +7,7 @@
     var curve = sjcl.ecc.curves.c192
 
     app.ports.encrypt.subscribe(function(tup) {
+	console.log("Encrypting a message.")
 	var plaintext = tup[0]
 	var key = tup[1]
 	var hkdf_output = sjcl.misc.hkdf(key, 640, 0, "hkdf encryption")
@@ -14,49 +15,33 @@
 	var encrypt_key = hkdf_output.slice(0,8)
     	var auth_key = hkdf_output.slice(8,16)
 	var iv = hkdf_output.slice(16)
-/*
-
-	var prp = new sjcl.cipher.aes(encrypt_key)
-
-	beware = new sjcl.beware["CBC mode is dangerous because it doesn't protect message integrity."]()
-
-	cipher = sjcl.mode.cbc.encrypt(prp, plaintext, iv)
-*/
 
 	params = {"iv":iv}
 	var cipher = sjcl.encrypt(encrypt_key, plaintext,params)
 	cipher = JSON.parse(cipher)
 
-	console.log(cipher)
+	//console.log(cipher)
 
 	app.ports.new_encrypt.send(cipher["ct"])
     });
 
     app.ports.decrypt.subscribe(function(tup) {
+	console.log("Decrypting a message.")
 	var cipher = tup[0]
 	var key = tup[1]
-	console.log(cipher,key)
+	//console.log(cipher,key)
 	var hkdf_output = sjcl.misc.hkdf(key, 640, 0, "hkdf encryption")
-	console.log(hkdf_output)
+	//console.log(hkdf_output)
     
 	var encrypt_key = hkdf_output.slice(0,8)
     	var auth_key = hkdf_output.slice(8,16)
 	var iv = hkdf_output.slice(16)
-/*
 
-	var prp = new sjcl.cipher.aes(encrypt_key)
-
-	beware = new sjcl.beware["CBC mode is dangerous because it doesn't protect message integrity."]()
-
-	plain = sjcl.mode.cbc.decrypt(prp, cipher, iv)
-*/
-
-	//plain = {"v":1,"iter":10000}
 	cipher = JSON.stringify({"ct":cipher})
 	
 	params = {"iv":iv}
 	var plain = sjcl.decrypt(encrypt_key, cipher,params)
-	console.log(plain)
+	//console.log(plain)
 
 	app.ports.new_decrypt.send(plain)
     });

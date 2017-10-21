@@ -376,20 +376,21 @@ view : Model -> Html Msg
 view model =
     div []
         [ button [ onClick GenerateDH ] [ text "Generate Keys" ]
-
-        --, button [ onClick HashKeys ] [ text "Hash Keys" ]
-        --, button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
-        --, button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
+        , button [ onClick HashKeys ] [ text "Hash Keys" ]
+        , button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
+        , button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
         , button [ onClick Init ] [ text "Init" ]
         , button [ onClick ReceiveFK ] [ text "ReceiveFK" ]
         , button [ onClick (SymmetricRatchet "receive") ] [ text "Ratchet Receive" ]
         , button [ onClick (SymmetricRatchet "send") ] [ text "Ratchet Send" ]
         , input [ onInput NewForeignKey ] []
-        , viewInternals model
-        , textarea [ onInput NewPlaintext, value model.plaintext ] []
-        , textarea [ onInput NewCiphertext, value model.ciphertext ] []
-        , button [ onClick Encrypt ] [ text "encrypt" ]
-        , button [ onClick Decrypt ] [ text "decrypt" ]
+        , div [] [ viewInternals model ]
+        , div []
+            [ textarea [ onInput NewPlaintext, value model.plaintext ] []
+            , button [ onClick Encrypt ] [ text "encrypt" ]
+            , textarea [ onInput NewCiphertext, value model.ciphertext ] []
+            , button [ onClick Decrypt ] [ text "decrypt" ]
+            ]
         ]
 
 
