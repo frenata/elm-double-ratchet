@@ -376,9 +376,10 @@ view : Model -> Html Msg
 view model =
     div []
         [ button [ onClick GenerateDH ] [ text "Generate Keys" ]
-        , button [ onClick HashKeys ] [ text "Hash Keys" ]
-        , button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
-        , button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
+
+        --, button [ onClick HashKeys ] [ text "Hash Keys" ]
+        --, button [ onClick (UpdateChain "receive") ] [ text "Update Receive Chain" ]
+        --, button [ onClick (UpdateChain "send") ] [ text "Update Send Chain" ]
         , button [ onClick Init ] [ text "Init" ]
         , button [ onClick ReceiveFK ] [ text "ReceiveFK" ]
         , button [ onClick (SymmetricRatchet "receive") ] [ text "Ratchet Receive" ]
@@ -411,11 +412,12 @@ viewInternals : Model -> Html Msg
 viewInternals model =
     ul []
         [ li [] [ text <| "Public: " ++ model.keypair.public.point ]
-        , li [] [ text <| "Secret: " ++ model.keypair.private.exponent ]
-        , li [] [ text <| "Hash:   " ++ toString model.hash ]
-        , li [] [ text <| "Root:   " ++ toString model.rootKey ]
-        , li [] [ text <| "rChain:" ++ toString model.receiveChainKey ]
-        , li [] [ text <| "sChain:   " ++ toString model.sendChainKey ]
+
+        --, li [] [ text <| "Secret: " ++ model.keypair.private.exponent ]
+        --, li [] [ text <| "Hash:   " ++ toString model.hash ]
+        --, li [] [ text <| "Root:   " ++ toString model.rootKey ]
+        --, li [] [ text <| "rChain:" ++ toString model.receiveChainKey ]
+        --, li [] [ text <| "sChain:   " ++ toString model.sendChainKey ]
         , li [] [ text <| "rMsg:" ++ toString model.receiveMsgKey ]
         , li [] [ text <| "sMsg:   " ++ toString model.sendMsgKey ]
         ]

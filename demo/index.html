@@ -1,0 +1,168 @@
+<div id="app"></div>
+<script src="app.js"></script>
+<script src="sjcl.js"></script>
+<script>
+    var app = Elm.Ratchet.fullscreen()
+    //var curve = sjcl.ecc.curves.c521
+    var curve = sjcl.ecc.curves.c192
+
+    app.ports.encrypt.subscribe(function(tup) {
+	console.log("Encrypting a message.")
+	var plaintext = tup[0]
+	var key = tup[1]
+	var hkdf_output = sjcl.misc.hkdf(key, 640, 0, "hkdf encryption")
+    
+	var encrypt_key = hkdf_output.slice(0,8)
+    	var auth_key = hkdf_output.slice(8,16)
+	var iv = hkdf_output.slice(16)
+
+	params = {"iv":iv}
+	var cipher = sjcl.encrypt(encrypt_key, plaintext,params)
+	cipher = JSON.parse(cipher)
+
+	//console.log(cipher)
+
+	app.ports.new_encrypt.send(cipher["ct"])
+    });
+
+    app.ports.decrypt.subscribe(function(tup) {
+	console.log("Decrypting a message.")
+	var cipher = tup[0]
+	var key = tup[1]
+	//console.log(cipher,key)
+	var hkdf_output = sjcl.misc.hkdf(key, 640, 0, "hkdf encryption")
+	//console.log(hkdf_output)
+    
+	var encrypt_key = hkdf_output.slice(0,8)
+    	var auth_key = hkdf_output.slice(8,16)
+	var iv = hkdf_output.slice(16)
+
+	cipher = JSON.stringify({"ct":cipher})
+	
+	params = {"iv":iv}
+	var plain = sjcl.decrypt(encrypt_key, cipher,params)
+	//console.log(plain)
+
+	app.ports.new_decrypt.send(plain)
+    });
+
+
+
+    app.ports.init_ratchet.subscribe(function(input) {
+        var root = input[1]
+        var fk = input[0]
+        fk = JSON.parse(fk)
+        fk = sjcl.ecc.deserialize(fk)
+        
+        var keypair = generateDH()
+        var pair = serializePair(keypair)
+        var hash = hashDH(keypair.sec, fk)
+        var chainKeys = updateChain(hash,"send",root)
+
+        app.ports.generated_keypair.send(pair)
+        app.ports.hashed_keys.send(hash)
+        app.ports.new_chain.send(chainKeys)
+    });
+    
+    app.ports.receive_fk.subscribe(function(input) {
+        var keys = input[0]
+        var root = input[1]
+        
+        keys = deserializePair(keys)
+        var sec = keys.sec
+        var foreign = keys.pub
+        var hash = hashDH(sec, foreign)
+        var receiveChain = updateChain(hash,"receive",root)
+        root = receiveChain[0]
+
+        var keypair = generateDH()
+        var pair = serializePair(keypair)
+        hash = hashDH(keypair.sec, foreign)
+        var sendChain = updateChain(hash,"send",root)
+
+        app.ports.generated_keypair.send(pair)
+        app.ports.hashed_keys.send(hash)
+        app.ports.new_chain.send(receiveChain)
+        app.ports.new_chain.send(sendChain)
+    });
+
+    app.ports.kdf_ck.subscribe(function(tuple) {
+        var chainKey = tuple[0]
+        var which = tuple[1]
+
+        var hmac = new sjcl.misc.hmac(chainKey, sjcl.hash.sha512)
+
+        var newChainKey = hmac.encrypt("new chain")
+        var newMsgKey = hmac.encrypt("new msg")
+
+        keys = new Array(3)
+        keys[0] = newChainKey
+        keys[1] = which
+        keys[2] = newMsgKey
+
+        app.ports.kdf_ck_get.send(keys)
+    });
+
+    app.ports.generate_keypair.subscribe(function() {
+        app.ports.generated_keypair.send(
+            serializePair(generateDH()))
+    });
+
+    app.ports.hash_keys.subscribe(function (keys) {
+        keys = deserializePair(keys)
+        var sec = keys.sec
+        var foreign = keys.pub
+        
+        app.ports.hashed_keys.send(hashDH(sec,foreign))
+    });
+
+    app.ports.update_chain.subscribe(function (tuple) {
+        hash = tuple[0]
+        which = tuple[1]
+        root = tuple[2]
+
+        app.ports.new_chain.send(updateChain(hash,which,root))
+    });
+
+function updateChain(hash,which,root) {
+    console.log("Update " + which + " chain.")
+    output = sjcl.misc.hkdf(hash, 512, root, "update chain")
+
+    newroot = output.slice(0,8)
+    newchain = output.slice(8)
+
+    keys = new Array(3)
+    keys[0] = newroot
+    keys[1] = which
+    keys[2] = newchain
+    
+    return keys
+}
+
+function generateDH() {
+    console.log("Generating keypair.")
+    return sjcl.ecc.elGamal.generateKeys(curve)
+}
+
+function hashDH(sec, foreign) {
+    console.log("Hashing foreign key.")
+    hash = sec.dh(foreign)
+    return hash
+}
+
+function serializePair(keypair) {
+    console.log("Serializing keypair")
+    var sec = keypair.sec.serialize()
+    var pub = keypair.pub.serialize()
+    var pair = {"pub":pub, "sec":sec}
+    return pair
+}
+
+function deserializePair(keypair) {
+    keys = JSON.parse(keypair)
+    var sec = sjcl.ecc.deserialize(keys.sec)
+    var foreign = sjcl.ecc.deserialize(keys.pub)
+    return {"sec":sec, "pub":foreign}
+}
+
+</script>
