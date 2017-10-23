@@ -7,7 +7,7 @@ It's written in Elm to make reasoning about the correctness of the functions eas
 
 #### Usage
 
-A full demo application will be forthcoming, but a very simple demo of the current state is available in the [demo]() directory.
+A full demo application will be forthcoming, but a very simple demo of the current state is available in the [demo](https://github.com/frenata/elm-double-ratchet/tree/master/demo) directory.
 
 Imagine that two users want to communicate: Alice and Bob.
 
