@@ -14,12 +14,14 @@ Imagine that two users want to communicate: Alice and Bob.
 1. Bob generates a pair of keys.
 2. Bob sends his public key to Alice.
 3. Alice runs "Init" with Bob's public key.
-4. Alice types a plaintext message, then encrypts the message into a ciphertext.
-5. Alice sends her public key and her ciphertext to Bob.
-6. Bob runs "Receive FK" on Alice's public key.
-7. Bob decrypts Alice's ciphertext.
+4. Alice, preparing to send, ratchets her Send chain.
+5. Alice types a plaintext message, then encrypts the message into a ciphertext.
+6. Alice sends her public key and her ciphertext to Bob.
+7. Bob runs "Receive FK" on Alice's public key.
+8. Bob, preparing to recieve, ratchets his Recieve chain.
+9. Bob decrypts Alice's ciphertext.
 
-At this point, steps 4-7 can be repeated as desired in either direction.
+At this point, steps 4-9 can be repeated as desired in either direction. Public keys are only sent and received when the "polarity" of the conversation changes, ie. when Bob sends a message to Alice rather than Alice to Bob. The Send and Recieve chains should be ratcheted before every encryption/decryption, respectively.
 
 #### Short Term Goals
 
